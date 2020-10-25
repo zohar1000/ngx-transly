@@ -6,5 +6,12 @@
 */
 {
   "files": [],
-  "references": []
+  "references": [
+    {
+      "path": "./projects/ngx-transly/tsconfig.lib.json"
+    },
+    {
+      "path": "./projects/ngx-transly/tsconfig.spec.json"
+    }
+]
 }
