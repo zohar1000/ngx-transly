@@ -3,15 +3,20 @@ import { TranslyLocalStorage } from './models/transly-local-storage.model';
 import { TranslyConfig } from './models/transly-config.model';
 import { transly } from './transly.const';
 import { TRANSLY_CONFIG } from './tokens/transly-config.token';
+import { BehaviorSubject } from 'rxjs';
+import { TranslyOnText } from './models/transly-on-text.model';
 
 @Injectable({ providedIn: 'root' })
 export class TranslyService {
   readonly FALLBACK_LANG = 'en';
-  langCode;
-  text;
-  langs = {};
-  injector: Injector = Injector.create({ providers: [] });
-  isReplaceAllEnabled;
+  private langCode;
+  private langName;
+  private text;
+  private langs = {};
+  private injector: Injector = Injector.create({ providers: [] });
+  text$: unknown = new BehaviorSubject<unknown>('');
+  isText$ = new BehaviorSubject(false);
+  onTextFns = [];
 
   constructor(private componentFactoryResolver: ComponentFactoryResolver,
               @Inject(TRANSLY_CONFIG) private config: TranslyConfig) {
@@ -19,13 +24,16 @@ export class TranslyService {
   }
 
   async init() {
-    let lang: TranslyLocalStorage;
-    const lsItem = localStorage.getItem(this.config.localStorageKey);
-    if (!lsItem) {
-      let langCode;
+    const lsStr = localStorage.getItem(this.config.localStorageKey);
+    let langCode;
+    if (lsStr) {
+      const lsItem: TranslyLocalStorage = JSON.parse(lsStr);
+      langCode = lsItem.langCode;
+    } else {
+      let langItem;
       if (this.config.isUseBrowserDefaultLang && navigator) {
         langCode = navigator.language;
-        let langItem = this.config.langs.find(item => item.code.toLowerCase() === langCode.toLowerCase());
+        langItem = this.config.langs.find(item => item.code.toLowerCase() === langCode.toLowerCase());
         if (!langItem) {
           langCode = langCode.substr(0, 2);
           langItem = this.config.langs.find(item => item.code.toLowerCase() === langCode.toLowerCase());
@@ -33,42 +41,63 @@ export class TranslyService {
         if (!langItem) langCode = '';
       }
       if (!langCode) {
-        const langItem = this.config.langs.find(item => item.default);
+        langItem = this.config.langs.find(item => item.default);
         if (langItem) langCode = langItem.code;
       }
       if (!langCode) langCode = this.FALLBACK_LANG;
-      lang = { langCode };
-      localStorage.setItem(this.config.localStorageKey, JSON.stringify(lang));
-    } else {
-      lang = JSON.parse(lsItem);
     }
-    await this.setLang(lang.langCode);
+    await this.setLang(langCode);
   }
 
   async setLang(langCode) {
-    this.langCode = langCode;
-    const lang: TranslyLocalStorage = { langCode };
-    localStorage.setItem(this.config.localStorageKey, JSON.stringify(lang));
     if (!this.langs[langCode]) {
-      this.langs[langCode] = await this.loadLang(langCode);
+      try {
+        this.langs[langCode] = await this.loadLang(langCode);
+      } catch (e) {
+        if (this.config.onLoadError) this.config.onLoadError(langCode, this.config, e);
+        console.error('Error loading language file, language:', langCode, ', config:', this.config, ', error:', e);
+      }
     }
-    this.text = this.langs[langCode];
-    this.config.setText(this.text);
+    if (this.langs[langCode]) {
+      this.langCode = langCode;
+      this.langName = this.config.langs.find(item => item.code === this.langCode).name;
+      this.text = this.langs[langCode];
+      this.updateLocalStorage(langCode);
+      if (this.config.setText) this.config.setText(this.text);
+      (this.text$ as BehaviorSubject<unknown>).next(this.text);
+      this.isText$.next(true);
+      this.onTextFns.forEach(fn => this.callOnTextFn(fn));
+      this.onTextFns.length = 0;
+    }
   }
 
   async loadLang(langCode) {
-    const file: any = await this.config.getLang(langCode);
+    const file: any = await this.config.loadLang(langCode);
     const className: any = Object.keys(file)[0];
     const componentFactory = this.componentFactoryResolver.resolveComponentFactory(file[className]);
     const inst: ComponentRef<any> = componentFactory.create(this.injector);
     return inst.instance.text;
   }
 
-  getLangs() {
-    return this.config.langs;
-  }
-
   get translate() {
     return transly;
+  }
+
+  updateLocalStorage(langCode) {
+    const lsItem: TranslyLocalStorage = { langCode };
+    localStorage.setItem(this.config.localStorageKey, JSON.stringify(lsItem));
+  }
+
+  onText(fn) {
+    if (this.isText$.value) {
+      this.callOnTextFn(fn);
+    } else {
+      this.onTextFns.push(fn);
+    }
+  }
+
+  callOnTextFn(fn) {
+    const data: TranslyOnText = { text: this.text, langCode: this.langCode, langName: this.langName, langs: this.config.langs };
+    fn(data);
   }
 }

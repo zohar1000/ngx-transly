@@ -1,6 +1,7 @@
 {
   "extends": "../../tslint.json",
   "rules": {
+    "align": false,
     "curly": false,
     "directive-selector": [
       true,
@@ -14,7 +15,10 @@
       "lib",
       "kebab-case"
     ],
+    "no-console": false,
     "no-string-literal": false,
-    "typedef": false
+    "space-before-function-paren": false,
+    "typedef": false,
+    "variable-name": false
   }
 }

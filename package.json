@@ -9,6 +9,7 @@
     "lint": "ng lint",
     "e2e": "ng e2e",
     "lib:build": "ng build ngx-transly --prod",
+    "lib:link": "npm run lib:build && cd dist/ngx-transly && npm link",
     "lib:publish": "npm run lib:build && cd dist/ngx-transly && npm publish"
   },
   "private": true,

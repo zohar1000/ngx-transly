@@ -6,7 +6,8 @@ export interface TranslyConfig {
     default?: boolean;
   }>;
   isUseBrowserDefaultLang: boolean;
-  getLang: (langCode: string) => void;
-  setText: (text) => void;
+  loadLang: (langCode: string) => void;
+  setText?: (text) => void;
   localStorageKey: string;
+  onLoadError?: (langCode: string, config: TranslyConfig, e: Error) => void;
 }

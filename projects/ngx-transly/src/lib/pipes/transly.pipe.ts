@@ -6,6 +6,7 @@ export class TranslyPipe implements PipeTransform {
   constructor(private translyService: TranslyService) {}
 
   transform(value: unknown, ...args: unknown[]): unknown {
+    if (!value) return '';
     if (!args) return value;
     return this.translyService.translate(value, ...args);
   }
